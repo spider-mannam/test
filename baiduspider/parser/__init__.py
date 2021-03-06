@@ -465,7 +465,7 @@ class Parser(BaseSpider):
             pages_ = pages_[:-1]
         return {"results": results, "pages": int(pages_[-1].text)}
 
-    def parse_wenku(self, content: str) -> dict:    # pragma: no cover
+    def parse_wenku(self, content: str) -> dict:  # pragma: no cover
         """解析百度文库搜索的页面源代码，目前不可用。
 
         Args:

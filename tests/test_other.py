@@ -58,9 +58,11 @@ class BaiduSpiderOtherTestCase(TestCase):
             self.assertIn(i["type"], ["result", "total"])
 
     def test_page(self):
-        result = self.spider.search_web('ocaiueno')
+        result = self.spider.search_web("ocaiueno")
         print(result)
-        result = self.spider.search_web('774f43c6744b47de98b1661d2344490b3761829a', pn=100)
+        result = self.spider.search_web(
+            "774f43c6744b47de98b1661d2344490b3761829a", pn=100
+        )
         print(result)
 
     def are_in(self, members: list, container: list):

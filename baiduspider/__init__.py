@@ -1,20 +1,21 @@
 """BaiduSpider，爬取百度的利器.
 
 :Author: Sam Zhang
-:Licence: MIT
+:Licence: GPL_V3
 :GitHub: https://github.com/samzhangjy
 :GitLab: https://gitlab.com/samzhangjy
 """
+import datetime
+import time as time_lib
+from time import mktime, strptime, time
 from urllib.parse import quote
-import re
-import threading
 
 import requests
 from bs4 import BeautifulSoup
 
 from baiduspider._spider import BaseSpider
-from baiduspider.parser import Parser
 from baiduspider.errors import ParseError, UnknownError
+from baiduspider.parser import Parser
 
 __all__ = ["BaiduSpider"]
 
@@ -49,7 +50,7 @@ class BaiduSpider(BaseSpider):
         BaiduSpider.`search_baike(self: BaiduSpider, query: str) -> dict`: 百度百科搜索
         """
         super().__init__()
-        # 爬虫名称（不是请求的，只是用来标识）
+        # 爬虫名称（不是请求的，只是用来表识）
         self.spider_name = "BaiduSpider"
         # 设置请求头
         self.headers = {
@@ -61,7 +62,9 @@ class BaiduSpider(BaseSpider):
         }
         self.parser = Parser()
 
-    def search_web(self, query: str, pn: int = 1, exclude: list = []) -> dict:
+    def search_web(
+        self, query: str, pn: int = 1, exclude: list = [], time: tuple = None
+    ) -> dict:
         """百度网页搜索.
 
         - 简单搜索：
@@ -213,6 +216,13 @@ class BaiduSpider(BaseSpider):
             当exclude=['all']时，将仅保留基本搜索结果和搜索结果总数。
             如果'all'在exclude列表里，则将忽略列表中的剩余部件，返回exclude=['all']时的结果。
 
+        - 按时间筛选：
+            >>> BaiduSpider().search_web('搜索词', time=(开始时间, 结束时间))
+            其中，开始时间和结束时间均为datetime.datetime类型，或者是使用time.time()函数生成的时间戳。
+            time参数也可以是以下任意一个字符串：['day', 'week', 'month', 'year']。它们分别表示：一天内、
+            一周内、一月内、一年内。
+            如果参数非法，BaiduSpider会忽略此次筛选。
+
         Args:
             query (str): 要爬取的搜索词.
             pn (int, optional): 爬取的页码. Defaults to 1.
@@ -235,9 +245,36 @@ class BaiduSpider(BaseSpider):
                 "calc",
                 "related",
             ]
+        # 按时间筛选
+        if type(time) == str:
+            to = datetime.datetime.now()
+            from_ = datetime.datetime(
+                to.year, to.month, to.day, to.hour, to.minute, to.second, to.microsecond
+            )
+            if time == "day":
+                from_ += datetime.timedelta(days=-1)
+            elif time == "week":
+                from_ += datetime.timedelta(days=-7)
+            elif time == "month":
+                from_ += datetime.timedelta(days=-31)
+            elif time == "year":
+                from_ += datetime.timedelta(days=-365)
+        elif type(time) == tuple or type(time) == list:
+            to = time[0]
+            from_ = time[1]
+        else:
+            to = from_ = None
+        if type(to) == datetime.datetime and type(from_) == datetime.datetime:
+            FORMAT = "%Y-%m-%d %H:%M:%S"
+            to = int(time_lib.mktime(time_lib.strptime(to.strftime(FORMAT), FORMAT)))
+            from_ = int(
+                time_lib.mktime(time_lib.strptime(from_.strftime(FORMAT), FORMAT))
+            )
         try:
             text = quote(query, "utf-8")
             url = "https://www.baidu.com/s?wd=%s&pn=%d" % (text, (pn - 1) * 10)
+            if to is not None and from_ is not None:
+                url += "&gpc=" + quote(f"stf={from_},{to}|stftype=1")
             content = self._get_response(url)
             results = self.parser.parse_web(content, exclude=exclude)
         except Exception as err:
@@ -245,82 +282,6 @@ class BaiduSpider(BaseSpider):
         finally:
             self._handle_error(error, "BaiduSpider", "parse-web")
         return {"results": results["results"], "total": results["pages"]}
-
-    def flat(self, result: dict) -> list:
-        """
-        "扁平化"搜索结果
-        结果样例：
-        [['python吧 - 百度贴吧',                                      # 标题
-          'http://tieba.baidu.com/f?kw=python&fr=ala0&loc=rec',     # 网址
-          'python学习交流基地。',                                      # 描述
-          'tieba'],                                                 # 类型
-         ['python安装相关博客',                       # 标题
-          'http://www.baidu.com/link?url=aJncmLXsD5iqIe47eQfESoydtwFay5podum390RFWEmiOcyntS4tM9Fo18_eDWOPoELF0NwLIKes-TusYYfWZnraAPRXZRJROaToaA05ifu',
-          None,                                     # 没有描述
-          'blog'],                                  # 类型
-         ['Python - Gitee',
-          'http://www.baidu.com/link?url=ssnksDzg7Cuh_uiT3hCLgiVYgx7A6tzYb1qGKjyQMjvZer4Y1AX1TGt1eAilYvYqphv8lhb31v_Lo7Q2oL4HrTkf_IXDrr9PtkmgfI9TFTX43KCgmuAEqE-X73K4CvZH',
-          'Python 算法集',
-          'gitee'],
-         ......
-         ['Python3.8.2中文版 32/64位 最新版 加速吧',
-          'python3.8.2版是一款非常专业的通用型计算机程序设计语言安装包。目前大版本已经来到了3.8.2版本,同时随着版本的不断更新和语言新功能的添加,越来越多被用于独立的...',
-          'http://www.baidu.com/link?url=s8pY0zaKIm7PY581uTkpEC2t_oHWV-5-5ta7V6QD4YrssPdlvqDvF1cQJykl0r2Jja3xyMRIQL6nDJI33NnTnq',
-          'result']]
-        Args:
-            result: BaiduSpider().search_web() 的返回结果
-
-        Returns:
-            list: 扁平化的结果
-
-        """
-        flat_result = []
-        for i in result['results']:
-            if i['type'] == 'news':
-                for j in i['results']:
-                    flat_result.append((j['title'], j['url'], j['des'], 'news'))
-            if i['type'] == 'baike':
-                flat_result.append([i['result']['title'], i['result']['url'], i['result']['des'], 'baike'])
-            if i['type'] == 'tieba':
-                flat_result.append([i['result']['title'], i['result']['url'], i['result']['des'], 'tieba'])
-            if i['type'] == 'blog':
-                flat_result.append([i['result']['title'], i['result']['url'], None, 'blog'])
-            if i['type'] == 'gitee':
-                flat_result.append([i['result']['title'], i['result']['url'], i['result']['des'], 'gitee'])
-            if i['type'] == 'result':
-                flat_result.append([i['title'], i['des'], i['url'], 'result'])
-        return flat_result
-
-    def convert_links(self, result: list):  # pragma: no cover
-        """
-        解析百度搜索结果中的链接，这个过程是多线程的，最多需要1.5秒。
-        目前不可用
-        """
-        convert = {}
-
-        def get_link_url(link):
-            if 'www.baidu.com/link?url=' not in link:
-                convert[link] = link
-                return
-            try:
-                r = requests.get(link, timeout=1).text
-                convert[link] = re.findall(r"URL='(http\S+)'", r)[0]
-            except (requests.exceptions.ConnectTimeout, requests.exceptions.ReadTimeout):
-                convert[link] = link
-
-        # from concurrent.futures import ThreadPoolExecutor
-        # pool = ThreadPoolExecutor(10)
-        for i in result:
-            # pool.submit(get_link_url, link=i[1])
-            print(i[1])
-            if i[3] != 'blog':
-                get_link_url(i[1])
-        # pool.shutdown(wait=True)
-
-        for i in result:
-            i[1] = convert[i[1]]
-
-        return result
 
     def search_pic(self, query: str, pn: int = 1) -> dict:
         """百度图片搜索.

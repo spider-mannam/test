@@ -122,7 +122,7 @@ class SpiderTestCase(TestCase):
             self.are_in(["title", "des", "date", "url", "count"], i)
 
     def test_flat(self):
-        python = self.spider.search_web('python')
+        python = self.spider.search_web("python")
         python = self.spider.flat(python)
         self.assertEqual(list, type(python))
         self.assertEqual(type(python[0][0]), str)
