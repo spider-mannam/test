@@ -2,6 +2,7 @@ from bs4 import BeautifulSoup
 
 from baiduspider._spider import BaseSpider
 from baiduspider.util import handle_err
+import requests
 
 
 class WebSubParser(BaseSpider):
@@ -87,6 +88,7 @@ class WebSubParser(BaseSpider):
                     b_cover = baike.find("video", class_="op-bk-polysemy-video")[
                         "data-src"
                     ]
+                    b_cover = requests.get(b_cover).url
                     b_cover_type = "video"
                 except TypeError:
                     b_cover = None
