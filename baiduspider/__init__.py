@@ -61,6 +61,7 @@ class BaiduSpider(BaseSpider):
             "Accept-Language": "en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7",
         }
         self.parser = Parser()
+        self.EMPTY = {"results": [], "pages": 0}
 
     def search_web(
         self, query: str, pn: int = 1, exclude: list = [], time: tuple = None
@@ -325,6 +326,7 @@ class BaiduSpider(BaseSpider):
             )
             content = self._get_response(url)
             result = self.parser.parse_pic(content)
+            result = result if result is not None else self.EMPTY
         except Exception as err:
             error = err
         finally:
@@ -378,6 +380,7 @@ class BaiduSpider(BaseSpider):
             source.encoding = "gb2312"
             code = source.text
             result = self.parser.parse_zhidao(code)
+            result = result if result is not None else self.EMPTY
         except Exception as err:
             error = err
         finally:
@@ -429,6 +432,7 @@ class BaiduSpider(BaseSpider):
             source = requests.get(url, headers=self.headers)
             code = self._minify(source.text)
             result = self.parser.parse_video(code)
+            result = result if result is not None else self.EMPTY
         except Exception as err:
             error = err
         finally:
@@ -483,6 +487,7 @@ class BaiduSpider(BaseSpider):
             # 压缩
             code = self._minify(source.text)
             result = self.parser.parse_news(code)
+            result = result if result is not None else self.EMPTY
         except Exception as err:
             error = err
         finally:
@@ -538,6 +543,7 @@ class BaiduSpider(BaseSpider):
             source.encoding = "gb2312"
             code = self._minify(source.text)
             result = self.parser.parse_wenku(code)
+            result = result if result is not None else self.EMPTY
         except Exception as err:
             error = err
         finally:
@@ -582,70 +588,22 @@ class BaiduSpider(BaseSpider):
         Returns:
             dict: 搜索结果以及总计的页码.
         """
-        url = "https://jingyan.baidu.com/search?word=%s&pn=%d&lm=0" % (
-            quote(query),
-            (pn - 1) * 10,
-        )
-        # 获取网页源代码
-        source = requests.get(url, headers=self.headers)
-        # 最小化代码
-        code = self._minify(source.text)
-        bs = BeautifulSoup(code, "html.parser")
-        # 加载搜索结果
-        data = bs.find("div", class_="search-list").findAll("dl")
-        results = []
-        for res in data:
-            # 标题
-            title = self._format(res.find("dt").find("a").text)
-            # 链接
-            url = "https://jingyan.baidu.com/" + res.find("dt").find("a")["href"]
-            # 简介
-            des = self._format(
-                res.find("dd")
-                .find("div", class_="summary")
-                .find("span", class_="abstract")
-                .text
+        error = None
+        try:
+            url = "https://jingyan.baidu.com/search?word=%s&pn=%d&lm=0" % (
+                quote(query),
+                (pn - 1) * 10,
             )
-            # 获取发布日期和分类，位于`<span class="cate"/>`中
-            tmp = self._format(
-                res.find("dd")
-                .find("div", class_="summary")
-                .find("span", class_="cate")
-                .text
-            ).split("-")
-            # 发布日期
-            date = self._format(tmp[1])
-            # 分类
-            category = self._format(tmp[-1]).strip("分类：")
-            # 支持票数
-            votes = int(
-                self._format(
-                    res.find("dt").find("span", class_="succ-times").text
-                ).strip("得票")
-            )
-            # 生成结果
-            result = {
-                "title": title,
-                "url": url,
-                "des": des,
-                "date": date,
-                "category": category,
-                "votes": votes,
-            }
-            results.append(result)  # 加入结果到集合中
-        # 获取分页
-        pages_ = bs.find("div", id="pg").findAll("a")[-1]
-        # 既不是最后一页也没有超出最后一页
-        if "尾页" in pages_.text:
-            # 获取尾页并加一
-            total = int(int(pages_["href"].split("&")[-1].strip("pn=")) / 10) + 1
-        # 是最后一页或者是超过了最后一页
-        else:
-            # 重新获取分页
-            pages_ = bs.find("div", id="pg").findAll("a")[1]
-            # 获取尾页并加一
-            total = int(int(pages_["href"].split("&")[-1].strip("pn=")) / 10) + 1
-        return {"results": results, "total": total}
+            source = requests.get(url, headers=self.headers)
+            code = self._minify(source.text)
+            result = self.parser.parse_jingyan(code)
+            result = result if result is not None else self.EMPTY
+        except Exception as err:
+            error = err
+        finally:
+            if error:
+                self._handle_error(error)
+        return {"results": result["results"], "total": result["pages"]}
 
     def search_baike(self, query: str) -> dict:
         """百度百科搜索.
@@ -673,38 +631,16 @@ class BaiduSpider(BaseSpider):
         Returns:
             dict: 搜索结果和总页数
         """
-        # 获取源码
-        source = requests.get(
-            "https://baike.baidu.com/search?word=%s" % quote(query),
-            headers=self.headers,
-        )
-        code = self._minify(source.text)
-        # 创建BeautifulSoup对象
-        soup = (
-            BeautifulSoup(code, "html.parser")
-            .find("div", class_="body-wrapper")
-            .find("div", class_="searchResult")
-        )
-        # 获取百科总数
-        total = int(
-            soup.find("div", class_="result-count")
-            .text.strip("百度百科为您找到相关词条约")
-            .strip("个")
-        )
-        # 获取所有结果
-        container = soup.findAll("dd")
-        results = []
-        for res in container:
-            # 链接
-            url = "https://baike.baidu.com" + self._format(
-                res.find("a", class_="result-title")["href"]
-            )
-            # 标题
-            title = self._format(res.find("a", class_="result-title").text)
-            # 简介
-            des = self._format(res.find("p", class_="result-summary").text)
-            # 更新日期
-            date = self._format(res.find("span", class_="result-date").text)
-            # 生成结果
-            results.append({"title": title, "des": des, "date": date, "url": url})
-        return {"results": results, "total": total}
+        error = None
+        try:
+            url = "https://baike.baidu.com/search?word=%s" % quote(query)
+            source = requests.get(url, headers=self.headers)
+            code = self._minify(source.text)
+            result = self.parser.parse_baike(code)
+            result = result if result is not None else self.EMPTY
+        except Exception as err:
+            error = err
+        finally:
+            if error:
+                self._handle_error(error)
+        return {"results": result["results"], "total": result["pages"]}

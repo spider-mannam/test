@@ -1,11 +1,11 @@
 import json
 from html import unescape
 
-from bs4 import BeautifulSoup
-
 from baiduspider._spider import BaseSpider
 from baiduspider.errors import ParseError
 from baiduspider.parser.subparser import WebSubParser
+from baiduspider.util import handle_err
+from bs4 import BeautifulSoup
 
 
 class Parser(BaseSpider):
@@ -25,10 +25,7 @@ class Parser(BaseSpider):
         """
         soup = BeautifulSoup(content, "html.parser")
         if soup.find("div", id="content_left") is None:
-            return {
-                "results": [],
-                "pages": 0
-            }
+            return {"results": [], "pages": 0}
         # 获取搜索结果总数
         num = int(
             str(soup.find("span", class_="nums_text").text)
@@ -263,6 +260,7 @@ class Parser(BaseSpider):
             "pages": max(pages),
         }
 
+    @handle_err
     def parse_pic(self, content: str) -> dict:
         """解析百度图片搜索的页面源代码.
 
@@ -530,4 +528,112 @@ class Parser(BaseSpider):
             total = int(
                 bs.find("div", class_="page-content").find("span", class_="cur").text
             )
+        return {"results": results, "pages": total}
+
+    def parse_jingyan(self, content: str) -> dict:
+        """解析百度经验搜索的页面源代码.
+
+        Args:
+            content (str): 已经转换为UTF-8编码的百度经验搜索HTML源码
+
+        Returns:
+            dict: 解析后的结果
+        """
+        # 最小化代码
+        code = self._minify(content)
+        bs = BeautifulSoup(code, "html.parser")
+        # 加载搜索结果
+        data = bs.find("div", class_="search-list").findAll("dl")
+        results = []
+        for res in data:
+            # 标题
+            title = self._format(res.find("dt").find("a").text)
+            # 链接
+            url = "https://jingyan.baidu.com/" + res.find("dt").find("a")["href"]
+            # 简介
+            des = self._format(
+                res.find("dd")
+                .find("div", class_="summary")
+                .find("span", class_="abstract")
+                .text
+            )
+            # 获取发布日期和分类，位于`<span class="cate"/>`中
+            tmp = self._format(
+                res.find("dd")
+                .find("div", class_="summary")
+                .find("span", class_="cate")
+                .text
+            ).split("-")
+            # 发布日期
+            date = self._format(tmp[1])
+            # 分类
+            category = self._format(tmp[-1]).strip("分类：")
+            # 支持票数
+            votes = int(
+                self._format(
+                    res.find("dt").find("span", class_="succ-times").text
+                ).strip("得票")
+            )
+            # 生成结果
+            result = {
+                "title": title,
+                "url": url,
+                "des": des,
+                "date": date,
+                "category": category,
+                "votes": votes,
+            }
+            results.append(result)  # 加入结果到集合中
+        # 获取分页
+        pages_ = bs.find("div", id="pg").findAll("a")[-1]
+        # 既不是最后一页也没有超出最后一页
+        if "尾页" in pages_.text:
+            # 获取尾页并加一
+            total = int(int(pages_["href"].split("&")[-1].strip("pn=")) / 10) + 1
+        # 是最后一页或者是超过了最后一页
+        else:
+            # 重新获取分页
+            pages_ = bs.find("div", id="pg").findAll("a")[1]
+            # 获取尾页并加一
+            total = int(int(pages_["href"].split("&")[-1].strip("pn=")) / 10) + 1
+        return {"results": results, "pages": total}
+
+    def parse_baike(self, content: str) -> dict:
+        """解析百度百科搜索的页面源代码.
+
+        Args:
+            content (str): 已经转换为UTF-8编码的百度百科搜索HTML源码
+
+        Returns:
+            dict: 解析后的结果
+        """
+        code = self._minify(content)
+        # 创建BeautifulSoup对象
+        soup = (
+            BeautifulSoup(code, "html.parser")
+            .find("div", class_="body-wrapper")
+            .find("div", class_="searchResult")
+        )
+        # 获取百科总数
+        total = int(
+            soup.find("div", class_="result-count")
+            .text.strip("百度百科为您找到相关词条约")
+            .strip("个")
+        )
+        # 获取所有结果
+        container = soup.findAll("dd")
+        results = []
+        for res in container:
+            # 链接
+            url = "https://baike.baidu.com" + self._format(
+                res.find("a", class_="result-title")["href"]
+            )
+            # 标题
+            title = self._format(res.find("a", class_="result-title").text)
+            # 简介
+            des = self._format(res.find("p", class_="result-summary").text)
+            # 更新日期
+            date = self._format(res.find("span", class_="result-date").text)
+            # 生成结果
+            results.append({"title": title, "des": des, "date": date, "url": url})
         return {"results": results, "pages": total}

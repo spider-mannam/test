@@ -22,7 +22,7 @@ class BaseSpider(object):
         Returns:
             str: 处理后的字符串
         """
-        return s.strip()
+        return s.strip().replace("\xa0", "")
 
     def _remove_html(self, s: str) -> str:
         """从字符串中去除HTML标签
