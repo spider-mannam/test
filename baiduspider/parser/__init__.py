@@ -25,7 +25,10 @@ class Parser(BaseSpider):
         """
         soup = BeautifulSoup(content, "html.parser")
         if soup.find("div", id="content_left") is None:
-            raise ParseError("Invalid HTML content.")
+            return {
+                "results": [],
+                "pages": 0
+            }
         # 获取搜索结果总数
         num = int(
             str(soup.find("span", class_="nums_text").text)
