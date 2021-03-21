@@ -372,7 +372,7 @@ class BaiduSpider(BaseSpider):
         error = None
         try:
             url = (
-                "https://zhidao.baidu.com/search?lm=0&rn=10&pn=0&fr=search&pn=%d&word=%s"
+                "https://zhidao.baidu.com/search?lm=0&rn=10&fr=search&pn=%d&word=%s"
                 % ((pn - 1) * 10, quote(query))
             )
             source = requests.get(url, headers=self.headers)

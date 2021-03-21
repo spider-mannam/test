@@ -335,6 +335,7 @@ class Parser(BaseSpider):
             # 屏蔽企业回答
             if "ec-oad" in item["class"]:
                 continue
+            # print(item.prettify() + '\n\n\n\n\n\n\n')
             # 标题
             title = item.find("dt").text.strip("\n")
             # 链接
@@ -342,13 +343,31 @@ class Parser(BaseSpider):
                 url = item.find("dt").find("a")["href"]
             except KeyError:
                 url = item.find("dt").find("a")["data-href"]
-            # 简介
-            des = item.find("dd", class_="dd").text
-            tmp = item.find("dd", class_="explain").findAll("span", class_="mr-8")
-            # 发布日期
-            date = item.find("dd", class_="explain").find("span", class_="mr-7").text
-            # 回答总数
-            count = int(str(tmp[-1].text).strip("\n").strip("个回答"))
+            if item.find("dd", class_="video-content") is not None:
+                item = item.find("div", class_="right")
+                tmp = item.findAll("div", class_="video-text")
+                # 简介
+                des = self._format(tmp[2].text)
+                # 发布日期
+                date = self._format(
+                    tmp[1]
+                    .text.strip("时间:")
+                    .replace("年", "-")
+                    .replace("月", "-")
+                    .replace("日", "")
+                )
+                # 回答总数
+                count = None
+            else:
+                # 简介
+                des = item.find("dd", class_="dd").text
+                tmp = item.find("dd", class_="explain").findAll("span", class_="mr-8")
+                # 发布日期
+                date = (
+                    item.find("dd", class_="explain").find("span", class_="mr-7").text
+                )
+                # 回答总数
+                count = int(str(tmp[-1].text).strip("\n").strip("个回答"))
             # 生成结果
             result = {
                 "title": title,
