@@ -367,7 +367,10 @@ class Parser(BaseSpider):
                     item.find("dd", class_="explain").find("span", class_="mr-7").text
                 )
                 # 回答总数
-                count = int(str(tmp[-1].text).strip("\n").strip("个回答"))
+                try:
+                    count = int(str(tmp[-1].text).strip("\n").strip("个回答"))
+                except:
+                    count = None
             # 生成结果
             result = {
                 "title": title,

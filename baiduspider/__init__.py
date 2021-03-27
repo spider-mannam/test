@@ -233,7 +233,7 @@ class BaiduSpider(BaseSpider):
             dict: 爬取的返回值和搜索结果
         """
         error = None
-        results = {"results": [], "pages": 0}
+        result = self.EMPTY
         # 按需解析
         if "all" in exclude:
             exclude = [
@@ -319,6 +319,7 @@ class BaiduSpider(BaseSpider):
             dict: 爬取的搜索结果
         """
         error = None
+        result = self.EMPTY
         try:
             url = "http://image.baidu.com/search/flip?tn=baiduimage&word=%s&pn=%d" % (
                 quote(query),
@@ -370,6 +371,7 @@ class BaiduSpider(BaseSpider):
             dict: 搜索结果以及总页码
         """
         error = None
+        result = self.EMPTY
         try:
             url = (
                 "https://zhidao.baidu.com/search?lm=0&rn=10&fr=search&pn=%d&word=%s"
@@ -423,6 +425,7 @@ class BaiduSpider(BaseSpider):
             dict: 搜索结果及总页码
         """
         error = None
+        result = self.EMPTY
         try:
             url = (
                 "http://v.baidu.com/v?no_al=1&word=%s&pn=%d&ie=utf-8&db=0&s=0&fbl=800"
@@ -477,6 +480,7 @@ class BaiduSpider(BaseSpider):
             dict: 爬取的搜索结果与总页码。
         """
         error = None
+        result = self.EMPTY
         try:
             url = "https://www.baidu.com/s?rtt=1&bsst=1&tn=news&word=%s&pn=%d" % (
                 quote(query),
@@ -534,6 +538,7 @@ class BaiduSpider(BaseSpider):
             dict: 搜索结果和总计页数
         """
         error = None
+        result = self.EMPTY
         try:
             url = "https://wenku.baidu.com/search?word=%s&pn=%d" % (
                 quote(query),
@@ -589,6 +594,7 @@ class BaiduSpider(BaseSpider):
             dict: 搜索结果以及总计的页码.
         """
         error = None
+        result = self.EMPTY
         try:
             url = "https://jingyan.baidu.com/search?word=%s&pn=%d&lm=0" % (
                 quote(query),
@@ -632,6 +638,7 @@ class BaiduSpider(BaseSpider):
             dict: 搜索结果和总页数
         """
         error = None
+        result = self.EMPTY
         try:
             url = "https://baike.baidu.com/search?word=%s" % quote(query)
             source = requests.get(url, headers=self.headers)
